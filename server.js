@@ -1,7 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import connectDB from './config/db.js';
 import passport from 'passport';
 import session from 'express-session';
 import './middleware/passportConfig.js'; // Initialize passport strategies
@@ -14,9 +13,6 @@ import paymentRoutes from './routes/paymentRoutes.js';
 
 // Load environment variables
 dotenv.config();
-
-// Connect to MongoDB
-connectDB();
 
 const app = express();
 
