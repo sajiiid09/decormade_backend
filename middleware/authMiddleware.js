@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import prisma from '../config/db.js';
 
 // Generate JWT token
 export const generateToken = (userId) => {
@@ -22,7 +22,10 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-__v');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: { addresses: true }
+    });
 
     if (!user) {
       return res.status(401).json({
@@ -65,7 +68,7 @@ export const authenticateToken = async (req, res, next) => {
 
 // Admin role middleware
 export const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
     return res.status(403).json({
       success: false,
       message: 'Admin access required'
@@ -82,7 +85,10 @@ export const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId).select('-__v');
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { addresses: true }
+      });
       
       if (user && user.isActive) {
         req.user = user;

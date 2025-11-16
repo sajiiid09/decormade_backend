@@ -467,10 +467,6 @@ DATABASE_URL=postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neond
 # JWT & Auth (Keep)
 JWT_SECRET=your-secret-key
 JWT_EXPIRE=7d
-SESSION_SECRET=your-session-secret
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_CALLBACK_URL=/api/users/auth/google/callback
 
 # Server (Keep)
 NODE_ENV=development

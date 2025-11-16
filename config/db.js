@@ -1,12 +1,13 @@
-import pkg from 'pg';
-const { Pool } = pkg;
+import { PrismaClient } from '@prisma/client';
 
-const pool = new Pool({
-  user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password: process.env.PG_PASSWORD,
-  port: process.env.PG_PORT || 5432,
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development'
+    ? ['query', 'error', 'warn']
+    : ['error'],
 });
 
-export default pool;
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
+
+export default prisma;

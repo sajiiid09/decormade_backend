@@ -10,20 +10,11 @@ import {
   getUserById,
   updateUser,
   deleteUser,
-  getUserStats,
-  googleAuth,
-  googleCallback,
-  handleGoogleAuth,
-  logout
+  getUserStats
 } from '../controllers/userController.js';
 import { authenticateToken, requireAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
-
-// Authentication routes
-router.get('/auth/google', googleAuth);
-router.get('/auth/google/callback', googleCallback, handleGoogleAuth);
-router.post('/logout', logout);
 
 // User profile routes
 router.get('/profile', authenticateToken, getUserProfile);
