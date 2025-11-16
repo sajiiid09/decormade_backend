@@ -19,10 +19,7 @@ const testConnection = async () => {
 const testEnvVars = () => {
   const requiredVars = [
     'DATABASE_URL',
-    'JWT_SECRET',
-    'SESSION_SECRET',
-    'GOOGLE_CLIENT_ID',
-    'GOOGLE_CLIENT_SECRET'
+    'JWT_SECRET'
   ];
 
   const missingVars = requiredVars.filter(varName => !process.env[varName]);

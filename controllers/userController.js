@@ -2,43 +2,40 @@ import prisma from '../config/db.js';
 import { asyncHandler } from '../middleware/authMiddleware.js';
 
 export const getUserProfile = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
-  
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Authentication required',
-    });
-  }
-
-  const fullUser = await prisma.user.findUnique({
-    where: { id: user.id },
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
     include: { addresses: true },
   });
 
-  const displayName = `${fullUser.firstName || ''} ${fullUser.lastName || ''}`.trim();
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found',
+    });
+  }
+
+  const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
 
   res.json({
     success: true,
     user: {
-      id: fullUser.id,
-      email: fullUser.email,
+      id: user.id,
+      email: user.email,
       name: displayName,
-      firstName: fullUser.firstName,
-      lastName: fullUser.lastName,
-      profilePicture: fullUser.profilePicture,
-      phone: fullUser.phone,
-      addresses: fullUser.addresses,
-      role: fullUser.role,
-      preferences: fullUser.preferences,
-      lastLogin: fullUser.lastLogin,
-      createdAt: fullUser.createdAt,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profilePicture: user.profilePicture,
+      phone: user.phone,
+      addresses: user.addresses,
+      role: user.role,
+      preferences: user.preferences,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
     }
   });
 });
 
 export const updateUserProfile = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
   const { name, phone, preferences } = req.body;
 
   const data = {};
@@ -51,30 +48,28 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
   }
   if (preferences) {
     data.preferences = {
-      ...(user.preferences || {}),
+      ...(req.user.preferences || {}),
       ...preferences,
     };
   }
 
-  const updatedUser = await prisma.user.update({
-    where: { id: user.id },
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
     data,
     include: { addresses: true },
   });
 
   res.json({
     success: true,
-    data: updatedUser,
+    data: user,
     message: 'Profile updated successfully',
   });
 });
 
 export const addUserAddress = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
-  
   await prisma.userAddress.create({
     data: {
-      userId: user.id,
+      userId: req.user.id,
       label: req.body.label || 'Other',
       type: req.body.type || 'shipping',
       phone: req.body.phone || null,
@@ -84,7 +79,7 @@ export const addUserAddress = asyncHandler(async (req, res) => {
   });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: user.id },
+    where: { userId: req.user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -96,12 +91,11 @@ export const addUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const updateUserAddress = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
   const address = await prisma.userAddress.findUnique({
     where: { id: req.params.addressId },
   });
 
-  if (!address || address.userId !== user.id) {
+  if (!address || address.userId !== req.user.id) {
     return res.status(404).json({
       success: false,
       message: 'Address not found',
@@ -120,7 +114,7 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
   });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: user.id },
+    where: { userId: req.user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -132,12 +126,11 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const deleteUserAddress = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
   const address = await prisma.userAddress.findUnique({
     where: { id: req.params.addressId },
   });
 
-  if (!address || address.userId !== user.id) {
+  if (!address || address.userId !== req.user.id) {
     return res.status(404).json({
       success: false,
       message: 'Address not found',
@@ -147,7 +140,7 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
   await prisma.userAddress.delete({ where: { id: req.params.addressId } });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: user.id },
+    where: { userId: req.user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -159,9 +152,8 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const getUserOrdersSummary = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
   const orders = await prisma.order.findMany({
-    where: { userId: user.id },
+    where: { userId: req.user.id },
     select: {
       id: true,
       status: true,
@@ -174,13 +166,13 @@ export const getUserOrdersSummary = asyncHandler(async (req, res) => {
   });
 
   const summary = await prisma.order.aggregate({
-    where: { userId: user.id },
+    where: { userId: req.user.id },
     _count: { _all: true },
     _sum: { total: true },
   });
 
-  const pendingOrders = await prisma.order.count({ where: { userId: user.id, status: 'pending' } });
-  const completedOrders = await prisma.order.count({ where: { userId: user.id, status: 'delivered' } });
+  const pendingOrders = await prisma.order.count({ where: { userId: req.user.id, status: 'pending' } });
+  const completedOrders = await prisma.order.count({ where: { userId: req.user.id, status: 'delivered' } });
 
   res.json({
     success: true,

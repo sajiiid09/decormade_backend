@@ -67,7 +67,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   const productMap = new Map(products.map(p => [p.id, p]));
 
-  let subtotal = 0;
+  let subtotal = decimal(0);
   const orderItemsData = [];
 
   for (const item of items) {
@@ -79,44 +79,56 @@ export const createOrder = asyncHandler(async (req, res) => {
       });
     }
 
-    if (product.stock < item.quantity) {
+    const quantity = Number(item.quantity);
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid quantity for ${product.name}. Quantity must be a positive integer.`,
+      });
+    }
+
+    if (product.stock < quantity) {
       return res.status(400).json({
         success: false,
         message: `Insufficient stock for ${product.name}. Available: ${product.stock}`,
       });
     }
 
-    const itemTotal = Number(product.price) * Number(item.quantity);
-    subtotal += itemTotal;
+    const price = decimal(product.price);
+    const itemTotal = price.times(quantity);
+    subtotal = subtotal.plus(itemTotal);
 
     orderItemsData.push({
       productId: product.id,
-      quantity: Number(item.quantity),
-      price: decimal(product.price),
-      total: decimal(itemTotal),
+      quantity,
+      price,
+      total: itemTotal,
     });
   }
 
-  const shippingCost = subtotal > 1000 ? 0 : 100;
-  const tax = subtotal * 0.05;
-  const total = subtotal + shippingCost + tax;
+  const shippingThreshold = decimal(1000);
+  const shippingFlatRate = decimal(100);
+  const shippingCost = subtotal.greaterThan(shippingThreshold) ? decimal(0) : shippingFlatRate;
+  const taxRate = decimal('0.05');
+  const tax = subtotal.times(taxRate);
+  const total = subtotal.plus(shippingCost).plus(tax);
 
-  const user = req.prismaUser || req.user;
   const order = await prisma.$transaction(async tx => {
     const createdOrder = await tx.order.create({
       data: {
         orderNumber: generateOrderNumber(),
-        userId: user.id,
+        userId: req.user.id,
         shippingAddress: shippingAddress || {},
         billingAddress: billingAddress || shippingAddress || {},
         paymentMethod,
         paymentStatus: 'pending',
         customerNote: notes?.customer || '',
         adminNote: notes?.admin || '',
-        subtotal: decimal(subtotal),
-        shippingCost: decimal(shippingCost),
-        tax: decimal(tax),
-        total: decimal(total),
+        subtotal,
+        shippingCost,
+        tax,
+        total,
         items: {
           create: orderItemsData,
         },
@@ -144,7 +156,6 @@ export const createOrder = asyncHandler(async (req, res) => {
 });
 
 export const getUserOrders = asyncHandler(async (req, res) => {
-  const user = req.prismaUser || req.user;
   const {
     page = 1,
     limit = 10,
@@ -152,7 +163,7 @@ export const getUserOrders = asyncHandler(async (req, res) => {
     paymentStatus,
   } = req.query;
 
-  const where = { userId: user.id };
+  const where = { userId: req.user.id };
   if (status) where.status = status;
   if (paymentStatus) where.paymentStatus = paymentStatus;
 
@@ -195,8 +206,7 @@ export const getOrder = asyncHandler(async (req, res) => {
     });
   }
 
-  const user = req.prismaUser || req.user;
-  if (order.userId !== user.id && user.role !== 'admin' && user.role !== 'ADMIN') {
+  if (order.userId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
     return res.status(403).json({
       success: false,
       message: 'Not authorized to view this order',
@@ -314,8 +324,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     });
   }
 
-  const user = req.prismaUser || req.user;
-  if (order.userId !== user.id && user.role !== 'admin' && user.role !== 'ADMIN') {
+  if (order.userId !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
     return res.status(403).json({
       success: false,
       message: 'Not authorized to cancel this order',

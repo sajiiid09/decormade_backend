@@ -13,7 +13,7 @@ enum UserRole {
 }
 
 model User {
-  id             String        @id // Clerk user ID (no default, set from Clerk)
+  id             String        @id @default(cuid())
   email          String        @unique
   password       String?
   firstName      String?
@@ -51,7 +51,7 @@ model Product {
   name          String
   description   String?
   category      String?
-  price         Decimal     
+  price         Decimal     @db.Numeric(12, 2)
   stock         Int         @default(0)
   images        Json?
   isActive      Boolean     @default(true)
@@ -85,10 +85,10 @@ model Order {
   paymentTransaction String?
   shippingAddress    Json?
   billingAddress     Json?
-  subtotal           Decimal     
-  shippingCost       Decimal     
-  tax                Decimal     
-  total              Decimal     
+  subtotal           Decimal     @db.Numeric(12, 2)
+  shippingCost       Decimal     @db.Numeric(12, 2)
+  tax                Decimal     @db.Numeric(12, 2)
+  total              Decimal     @db.Numeric(12, 2)
   trackingNumber     String?
   carrier            String?
   estimatedDelivery  DateTime?
@@ -111,8 +111,8 @@ model OrderItem {
   product   Product  @relation(fields: [productId], references: [id])
   productId String
   quantity  Int
-  price     Decimal  
-  total     Decimal  
+  price     Decimal  @db.Numeric(12, 2)
+  total     Decimal  @db.Numeric(12, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
