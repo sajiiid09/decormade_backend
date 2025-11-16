@@ -1,16 +1,44 @@
 import prisma from '../config/db.js';
 import { asyncHandler } from '../middleware/authMiddleware.js';
-import {
-  googleAuth,
-  googleCallback,
-  handleGoogleAuth,
-  logout,
-  getCurrentUser,
-} from '../middleware/passportConfig.js';
 
-export const getUserProfile = getCurrentUser;
+export const getUserProfile = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
+  
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+
+  const fullUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { addresses: true },
+  });
+
+  const displayName = `${fullUser.firstName || ''} ${fullUser.lastName || ''}`.trim();
+
+  res.json({
+    success: true,
+    user: {
+      id: fullUser.id,
+      email: fullUser.email,
+      name: displayName,
+      firstName: fullUser.firstName,
+      lastName: fullUser.lastName,
+      profilePicture: fullUser.profilePicture,
+      phone: fullUser.phone,
+      addresses: fullUser.addresses,
+      role: fullUser.role,
+      preferences: fullUser.preferences,
+      lastLogin: fullUser.lastLogin,
+      createdAt: fullUser.createdAt,
+    }
+  });
+});
 
 export const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
   const { name, phone, preferences } = req.body;
 
   const data = {};
@@ -23,28 +51,30 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
   }
   if (preferences) {
     data.preferences = {
-      ...(req.user.preferences || {}),
+      ...(user.preferences || {}),
       ...preferences,
     };
   }
 
-  const user = await prisma.user.update({
-    where: { id: req.user.id },
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
     data,
     include: { addresses: true },
   });
 
   res.json({
     success: true,
-    data: user,
+    data: updatedUser,
     message: 'Profile updated successfully',
   });
 });
 
 export const addUserAddress = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
+  
   await prisma.userAddress.create({
     data: {
-      userId: req.user.id,
+      userId: user.id,
       label: req.body.label || 'Other',
       type: req.body.type || 'shipping',
       phone: req.body.phone || null,
@@ -54,7 +84,7 @@ export const addUserAddress = asyncHandler(async (req, res) => {
   });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: req.user.id },
+    where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -66,11 +96,12 @@ export const addUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const updateUserAddress = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
   const address = await prisma.userAddress.findUnique({
     where: { id: req.params.addressId },
   });
 
-  if (!address || address.userId !== req.user.id) {
+  if (!address || address.userId !== user.id) {
     return res.status(404).json({
       success: false,
       message: 'Address not found',
@@ -89,7 +120,7 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
   });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: req.user.id },
+    where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -101,11 +132,12 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const deleteUserAddress = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
   const address = await prisma.userAddress.findUnique({
     where: { id: req.params.addressId },
   });
 
-  if (!address || address.userId !== req.user.id) {
+  if (!address || address.userId !== user.id) {
     return res.status(404).json({
       success: false,
       message: 'Address not found',
@@ -115,7 +147,7 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
   await prisma.userAddress.delete({ where: { id: req.params.addressId } });
 
   const addresses = await prisma.userAddress.findMany({
-    where: { userId: req.user.id },
+    where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -127,8 +159,9 @@ export const deleteUserAddress = asyncHandler(async (req, res) => {
 });
 
 export const getUserOrdersSummary = asyncHandler(async (req, res) => {
+  const user = req.prismaUser || req.user;
   const orders = await prisma.order.findMany({
-    where: { userId: req.user.id },
+    where: { userId: user.id },
     select: {
       id: true,
       status: true,
@@ -141,13 +174,13 @@ export const getUserOrdersSummary = asyncHandler(async (req, res) => {
   });
 
   const summary = await prisma.order.aggregate({
-    where: { userId: req.user.id },
+    where: { userId: user.id },
     _count: { _all: true },
     _sum: { total: true },
   });
 
-  const pendingOrders = await prisma.order.count({ where: { userId: req.user.id, status: 'pending' } });
-  const completedOrders = await prisma.order.count({ where: { userId: req.user.id, status: 'delivered' } });
+  const pendingOrders = await prisma.order.count({ where: { userId: user.id, status: 'pending' } });
+  const completedOrders = await prisma.order.count({ where: { userId: user.id, status: 'delivered' } });
 
   res.json({
     success: true,
@@ -318,4 +351,3 @@ export const getUserStats = asyncHandler(async (req, res) => {
   });
 });
 
-export { googleAuth, googleCallback, handleGoogleAuth, logout };

@@ -12,11 +12,22 @@ import {
   getFeaturedProducts,
   getRelatedProducts
 } from '../controllers/productController.js';
-import { authenticateToken, requireAdmin, optionalAuth } from '../middleware/authMiddleware.js';
+import { requireAdmin, optionalAuth } from '../middleware/clerkAuth.js';
 
 const router = express.Router();
 
-// Public routes
+// Middleware to require authentication
+const requireAuthenticated = (req, res, next) => {
+  if (!req.prismaUser) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+  next();
+};
+
+// Public routes (optional authentication)
 router.get('/', optionalAuth, getProducts);
 router.get('/categories', getProductCategories);
 router.get('/featured', getFeaturedProducts);
@@ -24,13 +35,13 @@ router.get('/:id', optionalAuth, getProduct);
 router.get('/:id/related', getRelatedProducts);
 
 // Protected routes (require authentication)
-router.post('/:id/reviews', authenticateToken, addProductReview);
-router.put('/:id/reviews/:reviewId', authenticateToken, updateProductReview);
-router.delete('/:id/reviews/:reviewId', authenticateToken, deleteProductReview);
+router.post('/:id/reviews', requireAuthenticated, addProductReview);
+router.put('/:id/reviews/:reviewId', requireAuthenticated, updateProductReview);
+router.delete('/:id/reviews/:reviewId', requireAuthenticated, deleteProductReview);
 
-// Admin routes
-router.post('/', authenticateToken, requireAdmin, createProduct);
-router.put('/:id', authenticateToken, requireAdmin, updateProduct);
-router.delete('/:id', authenticateToken, requireAdmin, deleteProduct);
+// Admin routes (require authentication + admin role)
+router.post('/', requireAuthenticated, requireAdmin, createProduct);
+router.put('/:id', requireAuthenticated, requireAdmin, updateProduct);
+router.delete('/:id', requireAuthenticated, requireAdmin, deleteProduct);
 
 export default router;

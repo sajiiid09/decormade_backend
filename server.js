@@ -1,15 +1,21 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import passport from 'passport';
-import session from 'express-session';
-import './middleware/passportConfig.js'; // Initialize passport strategies
+import { serve } from 'inngest/express';
+
+// Import Clerk middleware
+import { clerkMiddleware, attachClerkUser } from './middleware/clerkAuth.js';
+
+// Import Inngest setup
+import { inngest } from './inngest/client.js';
+import { inngestFunctions } from './inngest/functions/syncClerkUser.js';
 
 // Import routes
 import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,22 +30,23 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration for Passport
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+// Clerk authentication middleware (must come before routes)
+app.use(clerkMiddleware);
+app.use(attachClerkUser);
 
-// Passport middleware
-app.use(passport.initialize());
-app.use(passport.session());
+// Inngest endpoint for worker communication (must come before other routes)
+app.use(
+  '/api/inngest',
+  serve({
+    client: inngest,
+    functions: inngestFunctions,
+  })
+);
 
-// Routes
+// Webhook routes (before other routes but after Clerk middleware)
+app.use('/api/webhooks', webhookRoutes);
+
+// API Routes
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
@@ -64,7 +71,7 @@ app.use((err, req, res, next) => {
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     message: 'Route not found'
   });

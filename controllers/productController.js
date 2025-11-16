@@ -236,10 +236,11 @@ export const addProductReview = asyncHandler(async (req, res) => {
     });
   }
 
+  const user = req.prismaUser || req.user;
   const existingReview = await prisma.review.findFirst({
     where: {
       productId,
-      userId: req.user.id,
+      userId: user.id,
     },
   });
 
@@ -253,7 +254,7 @@ export const addProductReview = asyncHandler(async (req, res) => {
   const review = await prisma.review.create({
     data: {
       productId,
-      userId: req.user.id,
+      userId: user.id,
       rating: Number(rating),
       comment: comment || '',
     },
@@ -282,7 +283,8 @@ export const updateProductReview = asyncHandler(async (req, res) => {
     });
   }
 
-  if (review.userId !== req.user.id) {
+  const user = req.prismaUser || req.user;
+  if (review.userId !== user.id) {
     return res.status(403).json({
       success: false,
       message: 'Not authorized to update this review',
@@ -319,7 +321,8 @@ export const deleteProductReview = asyncHandler(async (req, res) => {
     });
   }
 
-  if (review.userId !== req.user.id && req.user.role !== 'ADMIN' && req.user.role !== 'admin') {
+  const user = req.prismaUser || req.user;
+  if (review.userId !== user.id && user.role !== 'ADMIN' && user.role !== 'admin') {
     return res.status(403).json({
       success: false,
       message: 'Not authorized to delete this review',
