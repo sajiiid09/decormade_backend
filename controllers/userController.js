@@ -2,15 +2,12 @@ import prisma from '../config/db.js';
 import { asyncHandler } from '../middleware/authMiddleware.js';
 
 export const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    include: { addresses: true },
-  });
+  const user = req.user;
 
   if (!user) {
-    return res.status(404).json({
+    return res.status(401).json({
       success: false,
-      message: 'User not found',
+      message: 'Authentication required',
     });
   }
 
@@ -26,7 +23,7 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       lastName: user.lastName,
       profilePicture: user.profilePicture,
       phone: user.phone,
-      addresses: user.addresses,
+      addresses: user.addresses || [],
       role: user.role,
       preferences: user.preferences,
       lastLogin: user.lastLogin,
